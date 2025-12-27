@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>政府資助計劃查詢系統</title>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Papa Parse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #f5f5f5;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c6c91, #2c3e50);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 i {
+            color: #ffcc00;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            max-width: 800px;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Accordion Styles */
+        .accordion-panel {
+            width: 500px;
+            background-color: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+            z-index: 500;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .accordion {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .accordion-item {
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e0e0e0;
+        }
+
+        .accordion-header {
+            background-color: #2c6c91;
+            color: white;
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .accordion-header:hover {
+            background-color: #1a5c7a;
+        }
+
+        .accordion-header.active {
+            background-color: #2c3e50;
+        }
+
+        .accordion-content {
+            background-color: white;
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .accordion-content.active {
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        /* Department Accordion Styles */
+        .department-accordion {
+            margin-bottom: 10px;
+        }
+
+        .department-header {
+            background-color: #4a90e2;
+            color: white;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            transition: background-color 0.2s;
+        }
+
+        .department-header:hover {
+            background-color: #3a80d2;
+        }
+
+        .department-header.active {
+            background-color: #2c6c91;
+        }
+
+        .department-content {
+            display: none;
+            background-color: #f8f9fa;
+            padding: 0;
+            /* max-height: 0; */
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            border-radius: 0 0 6px 6px;
+        }
+
+        .department-content.active {
+            display: block;
+            padding: 15px;
+            overflow-y: auto;
+            height: fit-content
+        }
+
+        /* Data Source Styles */
+        .data-source-item {
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .data-source-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-color: #4a90e2;
+        }
+
+        .data-source-item.active {
+            border-color: #ffcc00;
+            background-color: #fff9e6;
+        }
+
+        .data-source-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .data-source-status {
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .status-loaded {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .status-loading {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .status-error {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        /* Data Group Styles */
+        .data-group {
+            margin-bottom: 15px;
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .group-header {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            font-weight: 600;
+            color: #495057;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .group-content {
+            padding: 15px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .group-content.active {
+            max-height: 1000px;
+        }
+
+        .data-item {
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+
+        .data-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-color: #4a90e2;
+        }
+
+        .data-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .data-details {
+            font-size: 0.9rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .data-detail-item {
+            margin-bottom: 5px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .data-detail-item i {
+            color: #2c6c91;
+            margin-right: 8px;
+            margin-top: 3px;
+            width: 16px;
+        }
+
+        .counter {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #6c757d;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            margin-left: 8px;
+        }
+
+        .group-counter {
+            background-color: #4a90e2;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .btn {
+            background-color: #2c6c91;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background-color: #1a5c7a;
+        }
+
+        .btn.active {
+            background-color: #2c3e50;
+        }
+
+        .info-box {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #2c6c91;
+            font-size: 0.9rem;
+        }
+
+        .info-box h4 {
+            margin-bottom: 8px;
+            color: #2c3e50;
+        }
+
+        /* Search Box */
+        .search-box {
+            margin-bottom: 15px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2c6c91;
+        }
+
+        /* Footer Styles */
+        .footer {
+            background-color: #2c3e50;
+            color: white;
+            padding: 6px 20px;
+            text-align: center;
+            font-size: 0.85rem;
+            border-top: 1px solid #4a6491;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .footer-links a {
+            color: #ecf0f1;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: #3498db;
+        }
+
+        /* Stats Display */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 10px 0;
+            border-top: 1px dashed #ddd;
+            font-size: 0.9rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1.2rem;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.8rem;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2c6c91;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .data-display-container {
+            flex: 1;
+            background-color: #f8f9fa;
+            overflow-y: auto;
+            padding: 20px;
+            display: none;
+        }
+
+        .data-display-container.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .back-button {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            align-self: flex-start;
+        }
+
+        .back-button:hover {
+            background-color: #5a6268;
+        }
+
+        #dataDisplayContent {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* 響應式設計 - 小屏幕 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                overflow: auto;
+            }
+            
+            .accordion-panel {
+                width: 100%;
+                flex-shrink: 0;
+                border-right: none;
+                border-bottom: 1px solid #ddd;
+                max-height: 60vh;
+                display: flex;
+            }
+            
+            .data-display-container {
+                width: 100%;
+                max-height: 40vh;
+            }
+            
+            .header h1 {
+                font-size: 1.2rem;
+            }
+            
+            .header p {
+                font-size: 0.8rem;
+            }
+            
+            .accordion-panel.mobile-hidden {
+                display: none !important;
+            }
+        }
+
+        /* 響應式設計 - 非常小的屏幕（如 iPhone SE） */
+        @media (max-width: 375px) {
+            .accordion-panel {
+                max-height: 50vh;
+            }
+            
+            .data-display-container {
+                max-height: 50vh;
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.1rem;
+            }
+            
+            .header p {
+                font-size: 0.75rem;
+            }
+            
+            .data-source-name {
+                font-size: 0.9rem;
+            }
+            
+            .search-input {
+                padding: 10px 12px;
+                font-size: 0.9rem;
+            }
+            
+            .accordion-content.active {
+                padding: 15px;
+            }
+            
+            .data-source-item,
+            .data-item {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1><i class="fas fa-graduation-cap"></i> 政府資助計劃查詢系統</h1>
+        <p>查閱各政府部門資助計劃資訊，包括平和基金、青年生涯規劃、藝能發展等各類資助項目</p>
+    </div>
+
+    <div class="container">
+        <div class="accordion-panel" id="accordionPanel">
+            <div class="accordion">
+                <!-- Data Sources List -->
+                <div class="accordion-item">
+                    <div class="accordion-header active" id="headerDataSources">
+                        <span><i class="fas fa-database"></i> 資助計劃數據源</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="accordion-content active" id="contentDataSources">
+                        <div class="search-box">
+                            <input type="text" id="searchInput" class="search-input" placeholder="搜尋資助計劃名稱、機構或項目...">
+                        </div>
+
+                        <div class="info-box">
+                            <h4><i class="fas fa-info-circle"></i> 使用說明</h4>
+                            <p>1. 點擊部門展開查看該部門的資助計劃</p>
+                            <p>2. 點擊資助計劃查看詳細項目</p>
+                            <p>3. 使用搜尋框快速查找特定項目</p>
+                            <p>4. 點擊分組查看詳細資訊</p>
+                        </div>
+
+                        <div class="stats">
+                            <div class="stat-item">
+                                <div class="stat-value" id="totalProjects">0</div>
+                                <div class="stat-label">總項目數</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="totalOrganizations">0</div>
+                                <div class="stat-label">總機構數</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="visibleProjects">0</div>
+                                <div class="stat-label">顯示中</div>
+                            </div>
+                        </div>
+
+                        <div id="departmentsList">
+                            <!-- Departments and data sources will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div class="accordion-item">
+                    <div class="accordion-header" id="headerSettings">
+                        <span><i class="fas fa-cog"></i> 系統設定</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="accordion-content" id="contentSettings">
+                        <div class="control-group">
+                            <label><i class="fas fa-sync-alt"></i> 重新載入數據</label>
+                            <button class="btn" id="reloadDataBtn">
+                                <i class="fas fa-redo"></i> 重新載入所有數據
+                            </button>
+                        </div>
+
+                        <div class="control-group">
+                            <label><i class="fas fa-filter"></i> 顯示設定</label>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <label style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" id="autoExpandGroups" checked>
+                                    自動展開分組
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" id="showCounters" checked>
+                                    顯示計數器
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <h4><i class="fas fa-download"></i> 數據來源</h4>
+                            <p>所有數據來自香港政府開放數據平台</p>
+                            <p>數據更新時間取決於各部門發布頻率</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Display Container -->
+        <div class="data-display-container" id="dataDisplayContainer">
+            <button class="back-button" id="backToMainButton">
+                <i class="fas fa-arrow-left"></i> 返回
+            </button>
+            <div id="dataDisplayContent">
+                <!-- Data will be displayed here when a data source is selected -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-copyright">
+                &copy; 2024 政府資助計劃查詢系統<br />數據來源：香港政府開放數據平台
+            </div>
+            <div class="footer-links" style="display:none">
+                <span>最後更新時間：<span id="lastUpdateTime">-</span></span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Indicator -->
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <p>正在載入數據...</p>
+    </div>
+
+    <!-- Main Script -->
+    <script>
+        window.isTerminated = false;
+
+        const PROXY_URL = "https://cors-anywhere.herokuapp.com";
+        // Data sources configuration grouped by department
+        const dataSourcesByDepartment = {
+            '民政及青年事務局': [
+                {
+                    id: 'pingwo-fund',
+                    displayName: '平和基金資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv021/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'youth-career',
+                    displayName: '賽馬會青年生涯規劃計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv018/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'youth-adventure',
+                    displayName: '青年歷奇訓練活動資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv023/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'large-youth',
+                    displayName: '大型青年活動資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv008/resource.xml',
+                    format: 'xml',
+                    grouping: ['organization_unit_name_tc'],
+                    sorting: 'organization_unit_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'civic-education',
+                    displayName: '公民教育活動資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv004/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'youth-internship',
+                    displayName: '青年內地實習資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv007/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'community-investment',
+                    displayName: '社區投資共享基金資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv027/resource.csv',
+                    format: 'csv',
+                    grouping: ['project_nature_tc', 'district_tc', 'organisation_tc', 'service_unit_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'youth-exchange-intl',
+                    displayName: '國際青年交流資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv005/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'project_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'youth-exchange-mainland',
+                    displayName: '青年內地交流資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv006/resource.xml',
+                    format: 'xml',
+                    grouping: ['organisation_name_tc'],
+                    sorting: 'programme_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'positive-thinking',
+                    displayName: '青年正向思維活動資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv024/resource.xml',
+                    format: 'xml',
+                    grouping: ['funding_granted_tc', 'organisation_name_tc'],
+                    sorting: 'project_title_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'life-education',
+                    displayName: '青年生命教育資助計劃',
+                    url: 'https://www.hyab.gov.hk/datagovhk/hyabdiv017/resource.xml',
+                    format: 'xml',
+                    grouping: ['ngo_name_tc'],
+                    sorting: 'project_title_tc',
+                    itemIdentifier: null
+                }
+            ],
+            '香港數碼港管理有限公司': [
+                {
+                    id: 'ai-funding',
+                    displayName: '人工智能資助計劃',
+                    url: 'https://istartup.hk/opendata/aiss/aiss_hk.csv',
+                    format: 'csv',
+                    grouping: ['涉及範疇', '機構類別', '申請機構'],
+                    sorting: '項目名稱',
+                    itemIdentifier: null
+                }
+            ],
+            '文化體育及旅遊局': [
+                {
+                    id: 'arts-development',
+                    displayName: '藝能發展資助計劃成功申請名單',
+                    url: 'https://www.cstb.gov.hk/datagovhk/cstbdiv010/resource.xml',
+                    format: 'xml',
+                    grouping: ['grants_tc', 'organ_name_tc'],
+                    sorting: 'title_proposal_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'arts-events',
+                    displayName: '文化藝術盛事基金活動',
+                    url: 'https://www.cstb.gov.hk/datagovhk/cstbdiv013/resource.csv',
+                    format: 'csv',
+                    grouping: ['date_tc', 'venue_tc'],
+                    sorting: 'event_name_tc',
+                    itemIdentifier: null
+                },
+                {
+                    id: 'creative-smart',
+                    displayName: '獲創意智優計劃資助的核准項目',
+                    url: 'https://www.ccidahk.gov.hk/data/CSI_approved_projects.csv',
+                    format: 'csv',
+                    grouping: ['Project Name_TC', 'Name of Applicant_TC'],
+                    sorting: 'Name of Applicant_TC',
+                    itemIdentifier: null
+                }
+            ],
+            '數字政策辦公室': [
+                {
+                    id: 'social-innovation',
+                    displayName: '社會創新及創業發展基金資助項目',
+                    url: 'https://www.sie.gov.hk/html/sie/export/sie_projects.csv',
+                    format: 'csv',
+                    grouping: ['主要受惠者', '項目性質', '項目類型', '項目名稱'],
+                    sorting: '獲資助者',
+                    itemIdentifier: null
+                }
+            ]
+        };
+
+        // Flatten all data sources for easy access
+        const allDataSources = [];
+        Object.keys(dataSourcesByDepartment).forEach(department => {
+            dataSourcesByDepartment[department].forEach(source => {
+                source.department = department;
+                allDataSources.push(source);
+            });
+        });
+
+        // Application state
+        let appState = {
+            currentDataSource: null,
+            allData: {},
+            filteredData: {},
+            searchTerm: '',
+            autoExpandGroups: false,
+            showCounters: true,
+            dataSourceStatus: {}
+        };
+
+        // Initialize application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            setupAccordion();
+            setupEventListeners();
+            renderDepartmentsList();
+            loadAllDataSources();
+            updateLastUpdateTime();
+            
+            // 初始化響應式行為
+            handleResponsiveLayout();
+            window.addEventListener('resize', handleResponsiveLayout);
+        });
+
+        // Setup accordion functionality
+        function setupAccordion() {
+            const accordionHeaders = document.querySelectorAll('.accordion-header');
+
+            accordionHeaders.forEach(header => {
+                header.addEventListener('click', function (e) {
+                    const content = this.nextElementSibling;
+                    const isActive = this.classList.contains('active');
+
+                    // Close all accordion items
+                    accordionHeaders.forEach(h => {
+                        h.classList.remove('active');
+                        h.querySelector('.fa-chevron-down').style.transform = 'rotate(0deg)';
+                    });
+
+                    document.querySelectorAll('.accordion-content').forEach(c => {
+                        c.classList.remove('active');
+                    });
+
+                    // Open clicked item if it was not active
+                    if (!isActive) {
+                        this.classList.add('active');
+                        content.classList.add('active');
+                        this.querySelector('.fa-chevron-down').style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Search input
+            document.getElementById('searchInput').addEventListener('input', function (e) {
+                appState.searchTerm = e.target.value;
+                filterDataSourceList();
+            });
+
+            // Reload data button
+            document.getElementById('reloadDataBtn').addEventListener('click', function () {
+                loadAllDataSources();
+            });
+
+            // Auto expand groups checkbox
+            document.getElementById('autoExpandGroups').addEventListener('change', function (e) {
+                appState.autoExpandGroups = e.target.checked;
+                if (appState.currentDataSource) {
+                    renderDataSourceData();
+                }
+            });
+
+            // Show counters checkbox
+            document.getElementById('showCounters').addEventListener('change', function (e) {
+                appState.showCounters = e.target.checked;
+                if (appState.currentDataSource) {
+                    renderDataSourceData();
+                }
+            });
+
+            // Back button
+            document.getElementById('backToMainButton').addEventListener('click', function () {
+                document.getElementById('dataDisplayContainer').classList.remove('active');
+                appState.currentDataSource = null;
+                
+                // 在小屏幕上恢復顯示左側面板
+                if (window.innerWidth <= 768) {
+                    document.getElementById('accordionPanel').classList.remove('mobile-hidden');
+                }
+                
+                // 恢復標題
+                document.querySelector('.header h1').innerHTML = `
+                    <i class="fas fa-graduation-cap"></i> 政府資助計劃查詢系統
+                `;
+            });
+        }
+
+        // Handle responsive layout
+        function handleResponsiveLayout() {
+            const isMobile = window.innerWidth <= 768;
+            const accordionPanel = document.getElementById('accordionPanel');
+            const dataDisplayContainer = document.getElementById('dataDisplayContainer');
+            
+            if (isMobile) {
+                // 在小屏幕上，確保兩個容器都有正確的高度
+                accordionPanel.style.height = 'auto';
+                dataDisplayContainer.style.height = 'auto';
+                
+                if (appState.currentDataSource) {
+                    // 如果有數據源被選中，隱藏左側面板
+                    accordionPanel.classList.add('mobile-hidden');
+                } else {
+                    // 如果沒有數據源被選中，顯示左側面板
+                    accordionPanel.classList.remove('mobile-hidden');
+                    dataDisplayContainer.classList.remove('active');
+                }
+            } else {
+                // 在大屏幕上，恢復正常顯示
+                accordionPanel.classList.remove('mobile-hidden');
+                accordionPanel.style.height = '';
+                dataDisplayContainer.style.height = '';
+            }
+        }
+
+        // Render departments list
+        function renderDepartmentsList() {
+            const container = document.getElementById('departmentsList');
+            container.innerHTML = '';
+
+            Object.keys(dataSourcesByDepartment).forEach(department => {
+                const dataSources = dataSourcesByDepartment[department];
+                const departmentItemCount = dataSources.length;
+
+                const departmentAccordion = document.createElement('div');
+                departmentAccordion.className = 'department-accordion';
+                departmentAccordion.innerHTML = `
+                    <div class="department-header">
+                        <span>
+                            ${department}
+                            ${appState.showCounters ? `<span class="counter">${departmentItemCount}</span>` : ''}
+                        </span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="department-content"></div>
+                `;
+
+                container.appendChild(departmentAccordion);
+
+                // Add click event to department header
+                const departmentHeader = departmentAccordion.querySelector('.department-header');
+                const departmentContent = departmentAccordion.querySelector('.department-content');
+
+                departmentHeader.addEventListener('click', function () {
+                    const isActive = this.classList.contains('active');
+
+                    // Toggle active class
+                    this.classList.toggle('active');
+                    departmentContent.classList.toggle('active');
+
+                    // Rotate icon
+                    const icon = this.querySelector('.fa-chevron-down');
+                    icon.style.transform = isActive ? 'rotate(0deg)' : 'rotate(180deg)';
+
+                    // Render data sources if not already rendered
+                    if (!isActive && departmentContent.children.length === 0) {
+                        renderDepartmentDataSources(department, departmentContent);
+                    }
+                });
+            });
+        }
+
+        // Render data sources for a department
+        function renderDepartmentDataSources(department, container) {
+            const dataSources = dataSourcesByDepartment[department];
+
+            dataSources.forEach(source => {
+                const status = appState.dataSourceStatus[source.id] || 'not-loaded';
+                const statusText = status === 'loaded' ? '已載入' :
+                    status === 'loading' ? '載入中' :
+                        status === 'error' ? '錯誤' : '未載入';
+                const statusClass = `status-${status}`;
+
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'data-source-item';
+                sourceItem.dataset.sourceId = source.id;
+                sourceItem.innerHTML = `
+                    <div class="data-source-name">
+                        ${source.displayName}
+                        <span class="data-source-status ${statusClass}">${statusText}</span>
+                    </div>
+                `;
+
+                sourceItem.addEventListener('click', function () {
+                    selectDataSource(source);
+                });
+
+                container.appendChild(sourceItem);
+            });
+        }
+
+        // Select a data source
+        function selectDataSource(source) {
+            appState.currentDataSource = source;
+
+            // Show data display container
+            document.getElementById('dataDisplayContainer').classList.add('active');
+
+            // 在小屏幕上隱藏左側面板
+            if (window.innerWidth <= 768) {
+                document.getElementById('accordionPanel').classList.add('mobile-hidden');
+            }
+
+            // Update title
+            document.querySelector('.header h1').innerHTML = `
+                <i class="fas fa-graduation-cap"></i> ${source.department} - ${source.displayName}
+            `;
+
+            // Render data
+            renderDataSourceData();
+        }
+
+        // Load all data sources
+        async function loadAllDataSources() {
+            showLoading(true);
+
+            try {
+                const promises = allDataSources.map(async (source) => {
+                    try {
+                        appState.dataSourceStatus[source.id] = 'loading';
+                        updateDataSourceStatus(source.id, 'loading');
+
+                        const data = await fetchDataSource(source);
+                        appState.allData[source.id] = data;
+                        appState.dataSourceStatus[source.id] = 'loaded';
+                        updateDataSourceStatus(source.id, 'loaded');
+                        return { source: source.id, success: true };
+                    } catch (error) {
+                        console.error(`Error loading ${source.displayName}:`, error);
+                        appState.dataSourceStatus[source.id] = 'error';
+                        updateDataSourceStatus(source.id, 'error');
+                        return { source: source.id, success: false, error: error.message };
+                    }
+                });
+
+                await Promise.allSettled(promises);
+                updateLastUpdateTime();
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Update data source status in UI
+        function updateDataSourceStatus(sourceId, status) {
+            const sourceItem = document.querySelector(`.data-source-item[data-source-id="${sourceId}"]`);
+            if (sourceItem) {
+                const statusSpan = sourceItem.querySelector('.data-source-status');
+                const statusText = status === 'loaded' ? '已載入' :
+                    status === 'loading' ? '載入中' :
+                        status === 'error' ? '錯誤' : '未載入';
+                statusSpan.textContent = statusText;
+                statusSpan.className = `data-source-status status-${status}`;
+            }
+        }
+
+        // Fetch data from a data source
+        async function fetchDataSource(source) {
+            const response = await fetch(`${PROXY_URL}/${source.url}`, {
+                headers: {
+                    'Accept': source.format === 'xml' ? 'application/xml' : 'text/csv'
+                }
+            });
+
+            if (!response.ok) {
+                if (!isTerminated) {
+                    window.isTerminated = true;
+                    document.querySelector('body').style.display = 'none';
+                    alert(`無法載入 ${source.displayName}，請啟用 PROXY: ${PROXY_URL}。`);
+                    window.open(`${PROXY_URL}/corsdemo`, '_blank');
+                }
+                return;
+            }
+
+            let data;
+
+            if (source.format === 'xml') {
+                const text = await response.text();
+                data = parseXMLData(text, source);
+            } else if (source.format === 'csv') {
+                const text = await response.text();
+                data = parseCSVData(text, source);
+            }
+
+            return processDataSource(data, source);
+        }
+
+        // Parse XML data
+        function parseXMLData(xmlText, source) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+            // Extract data based on source type
+            const items = [];
+            const rootElement = xmlDoc.querySelector('data-set');
+
+            if (rootElement) {
+                // Get all child elements
+                const childNodes = Array.from(rootElement.children);
+
+                childNodes.forEach(child => {
+                    const item = {};
+                    Array.from(child.children).forEach(grandChild => {
+                        item[grandChild.tagName] = grandChild.textContent;
+                    });
+
+                    if (Object.keys(item).length > 0) {
+                        // Generate unique ID if not exists
+                        item.id = generateUniqueId();
+                        items.push(item);
+                    }
+                });
+            }
+
+            return items;
+        }
+
+        // Parse CSV data
+        function parseCSVData(csvText, source) {
+            const results = Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true
+            });
+
+            const items = results.data.map(item => {
+                // Generate unique ID
+                item.id = generateUniqueId();
+                return item;
+            });
+
+            return items;
+        }
+
+        // Process data source
+        function processDataSource(items, source) {
+            // Group data according to configuration
+            const groupedData = groupData(items, source.grouping, source.sorting);
+            return {
+                items: items,
+                groupedData: groupedData,
+                stats: {
+                    totalItems: items.length,
+                    totalGroups: Object.keys(groupedData).length
+                }
+            };
+        }
+
+        // Group data by specified fields
+        function groupData(items, groupingFields, sortField) {
+            if (!groupingFields || groupingFields.length === 0) {
+                return { '所有項目': sortData(items, sortField) };
+            }
+
+            return recursiveGroup(items, groupingFields, 0, sortField);
+        }
+
+        // Recursive grouping function
+        function recursiveGroup(items, groupingFields, depth, sortField) {
+            if (depth >= groupingFields.length) {
+                return sortData(items, sortField);
+            }
+
+            const currentField = groupingFields[depth];
+            const groups = {};
+
+            // Group items by current field
+            items.forEach(item => {
+                const groupKey = item[currentField] || '未分類';
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+                groups[groupKey].push(item);
+            });
+
+            // Recursively group subgroups
+            const result = {};
+            Object.keys(groups).sort().forEach(groupKey => {
+                result[groupKey] = recursiveGroup(groups[groupKey], groupingFields, depth + 1, sortField);
+            });
+
+            return result;
+        }
+
+        // Sort data by specified field
+        function sortData(items, sortField) {
+            if (!sortField || !items || items.length === 0) {
+                return items;
+            }
+
+            return [...items].sort((a, b) => {
+                const aValue = a[sortField] || '';
+                const bValue = b[sortField] || '';
+                return aValue.localeCompare(bValue, 'zh-Hant-HK');
+            });
+        }
+
+        // Generate unique ID
+        function generateUniqueId() {
+            return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Render data source data
+        function renderDataSourceData() {
+            const container = document.getElementById('dataDisplayContent');
+
+            if (!appState.currentDataSource) {
+                container.innerHTML = '<div class="info-box">請選擇數據源</div>';
+                return;
+            }
+
+            const sourceId = appState.currentDataSource.id;
+            const data = appState.allData[sourceId];
+
+            if (!data) {
+                container.innerHTML = `
+                    <div class="info-box">
+                        <h4><i class="fas fa-exclamation-circle"></i> 數據尚未載入</h4>
+                        <p>數據正在載入中，請稍後再試</p>
+                    </div>
+                `;
+                updateStats(0, 0, 0);
+                return;
+            }
+
+            const displayData = appState.filteredData[sourceId] || data.groupedData;
+
+            container.innerHTML = createGroupHTML(displayData, 0);
+
+            // Setup group click events
+            setupGroupEvents();
+
+            // Update statistics
+            updateStats(
+                data.stats.totalItems,
+                data.stats.totalGroups,
+                data.stats.totalItems
+            );
+        }
+
+        // Create HTML for group
+        function createGroupHTML(groupData, level) {
+            if (Array.isArray(groupData)) {
+                // Render items
+                return groupData.map(item => createItemHTML(item)).join('');
+            }
+
+            // Render subgroups
+            let html = '';
+            Object.keys(groupData).forEach(groupName => {
+                const subgroup = groupData[groupName];
+                const itemCount = Array.isArray(subgroup) ? subgroup.length : countItems(subgroup);
+
+                html += `
+                    <div class="data-group" data-level="${level}">
+                        <div class="group-header">
+                            <span>
+                                ${groupName || '未分類'}
+                                ${appState.showCounters ? `<span class="counter group-counter">${itemCount}</span>` : ''}
+                            </span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="group-content ${appState.autoExpandGroups ? 'active' : ''}">
+                            ${createGroupHTML(subgroup, level + 1)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        // Count items in a group
+        function countItems(groupData) {
+            if (Array.isArray(groupData)) {
+                return groupData.length;
+            }
+
+            let count = 0;
+            Object.keys(groupData).forEach(key => {
+                count += countItems(groupData[key]);
+            });
+
+            return count;
+        }
+
+        // Create HTML for item
+        function createItemHTML(item) {
+            let details = '';
+
+            // Create details based on item properties
+            Object.keys(item).forEach(key => {
+                if (key !== 'id' && item[key]) {
+                    details += `
+                        <div class="data-detail-item">
+                            <i class="fas fa-circle"></i>
+                            <span><strong>${key}:</strong> ${item[key]}</span>
+                        </div>
+                    `;
+                }
+            });
+
+            return `
+                <div class="data-item" data-item-id="${item.id}">
+                    <div class="data-name">
+                        ${getItemDisplayName(item)}
+                    </div>
+                    <div class="data-details">
+                        ${details}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Get display name for item
+        function getItemDisplayName(item) {
+            // Try to find a name field based on common patterns
+            const nameFields = [
+                'project_name_tc', 'project_title_tc', 'programme_name_tc',
+                'title_proposal_tc', 'event_name_tc', '項目名稱',
+                'Project Name_TC', 'project_name_sc', 'project_title_sc',
+                'programme_name_sc', 'title_proposal_sc', 'event_name_sc'
+            ];
+
+            for (const field of nameFields) {
+                if (item[field]) {
+                    return item[field];
+                }
+            }
+
+            // Fallback to first non-empty field
+            for (const key in item) {
+                if (item[key] && key !== 'id') {
+                    return item[key];
+                }
+            }
+
+            return '未命名項目';
+        }
+
+        // Setup group events
+        function setupGroupEvents() {
+            document.querySelectorAll('.group-header').forEach(header => {
+                header.addEventListener('click', function () {
+                    const content = this.nextElementSibling;
+                    const isActive = content.classList.contains('active');
+
+                    content.classList.toggle('active');
+                    const icon = this.querySelector('.fa-chevron-down');
+                    icon.style.transform = isActive ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            });
+        }
+
+        // Filter data source list
+        function filterDataSourceList() {
+            const searchTerm = appState.searchTerm.toLowerCase().trim();
+            const departmentHeaders = document.querySelectorAll('.department-header');
+
+            if (!searchTerm) {
+                // Show all
+                document.querySelectorAll('.data-source-item').forEach(item => {
+                    item.style.display = 'block';
+                });
+
+                departmentHeaders.forEach(header => {
+                    const content = header.nextElementSibling;
+                    const hasVisibleItems = Array.from(content.querySelectorAll('.data-source-item'))
+                        .some(item => item.style.display !== 'none');
+
+                    header.style.display = 'block';
+                    if (hasVisibleItems) {
+                        header.classList.add('active');
+                        content.classList.add('active');
+                        header.querySelector('.fa-chevron-down').style.transform = 'rotate(180deg)';
+                    }
+                });
+                return;
+            }
+
+            // Filter data source items
+            let hasVisibleItems = false;
+            document.querySelectorAll('.data-source-item').forEach(item => {
+                const sourceName = item.querySelector('.data-source-name').textContent.toLowerCase();
+
+                if (sourceName.includes(searchTerm)) {
+                    item.style.display = 'block';
+                    hasVisibleItems = true;
+
+                    // Show parent department
+                    const departmentHeader = item.closest('.department-accordion').querySelector('.department-header');
+                    departmentHeader.style.display = 'block';
+                    departmentHeader.classList.add('active');
+                    departmentHeader.nextElementSibling.classList.add('active');
+                    departmentHeader.querySelector('.fa-chevron-down').style.transform = 'rotate(180deg)';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            // Hide departments with no visible items
+            departmentHeaders.forEach(header => {
+                const content = header.nextElementSibling;
+                const departmentVisibleItems = Array.from(content.querySelectorAll('.data-source-item'))
+                    .some(item => item.style.display === 'block');
+
+                if (!departmentVisibleItems) {
+                    header.style.display = 'none';
+                }
+            });
+        }
+
+        // Update statistics display
+        function updateStats(totalProjects, totalOrganizations, visibleProjects) {
+            document.getElementById('totalProjects').textContent = totalProjects;
+            document.getElementById('totalOrganizations').textContent = totalOrganizations;
+            document.getElementById('visibleProjects').textContent = visibleProjects;
+        }
+
+        // Update last update time
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-Hant-HK', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            document.getElementById('lastUpdateTime').textContent = timeString;
+        }
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+        }
+    </script>
+</body>
+
+</html>
